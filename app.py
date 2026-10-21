@@ -1,104 +1,116 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
+import json
 import os
-from sklearn.ensemble import RandomForestClassifier
+import datetime
+from collections import Counter
 
-st.set_page_config(page_title="脳レーシング AI予想＆自動学習", layout="wide")
-st.title("🏇 脳レーシング 単勝AI学習＆予測サイト")
+# --- データファイル設定 ---
+DATA_FILE = "byn_history.json"
+PENDING_FILE = "byn_pending.json"
 
-# 1. 学習データベースの読み込み・初期化
-DATA_FILE = "brain_racing_learning_db.csv"
+def load_json(file_path, default_val):
+    if os.path.exists(file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return default_val
 
-mark_scores = {
-    '◎': 10, '◯': 8,  '△': 6,  '✕': 4,
-    '⑳': 7,  '●': 5,  '▲': 4,  '✖': 2,
-    '☆': 1.5, '★': 1.0, 'T': 1.0, '無印': 0
-}
+def save_json(file_path, data):
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-# サイドバー：過去学習データの管理
-st.sidebar.header("📊 AIの学習データ状況")
-if os.path.exists(DATA_FILE):
-    db_df = pd.read_csv(DATA_FILE)
-    st.sidebar.metric("蓄積データ数", f"{len(db_df)} 件")
-    st.sidebar.dataframe(db_df.tail(10))
-else:
-    # 初期空データベース作成
-    db_df = pd.DataFrame(columns=['car', 'pt', 'mark', 'mark_score', 'is_1st'])
-    db_df.to_csv(DATA_FILE, index=False)
-    st.sidebar.write("現在データは0件です。結果を登録してAIを育てましょう！")
-
-# 2. メイン画面：出走表データ（スクショ確認 & データ確認）
-st.header("1. 出走表スクショ & レースデータ設定")
-uploaded_file = st.file_uploader("出走表のスクショを選択してください", type=["png", "jpg", "jpeg"])
-
-if uploaded_file is not None:
-    col_img, col_data = st.columns([1, 2])
-    with col_img:
-        st.image(uploaded_file, caption="選択したスクショ", use_container_width=True)
-    
-    with col_data:
-        st.subheader("📝 7車のデータ確認（競走得点・脳ルール印）")
-        st.caption("※スクショを見ながら、各車の得点と脳ルール適用後の最終印を確認・調整します。")
-        
-        # デフォルト入力用のデータフレーム
-        input_data = []
-        for i in range(1, 8):
-            c1, c2, c3 = st.columns([1, 2, 2])
-            with c1:
-                st.write(f"**{i}番車**")
-            with c2:
-                pt = st.number_input(f"得点 ({i}番)", value=80.0, step=0.1, key=f"pt_{i}")
-            with c3:
-                mark = st.selectbox(f"最終印 ({i}番)", list(mark_scores.keys()), index=0 if i==1 else 13, key=f"mark_{i}")
-            
-            input_data.append({"car": i, "pt": pt, "mark": mark, "mark_score": mark_scores[mark]})
-
-        race_df = pd.DataFrame(input_data)
-
-    # 3. AIによる1着予測（リアルタイム算出）
-    st.divider()
-    st.header("2. 🤖 AIの1着予測（可能性順）")
-
-    # 学習済みデータがあればRandomForestで予測、無ければ初期ルールで算出
-    if len(db_df) >= 10 and db_df['is_1st'].sum() > 0:
-        X_train = db_df[['car', 'pt', 'mark_score']]
-        y_train = db_df['is_1st']
-        model = RandomForestClassifier(n_estimators=50, random_state=42)
-        model.fit(X_train, y_train)
-        
-        # 1着確率の試算
-        probs = model.predict_proba(race_df[['car', 'pt', 'mark_score']])[:, 1]
-        race_df['AI1着確率'] = (probs * 100).round(1)
-        race_df['ai_score'] = probs
+def analyze_byn_match(b_rare, y_rare, n_rare, b_axis, y_axis, n_axis):
+    """B・Y・Nの重なり具合を自動判定"""
+    # 荒れ指定の重なり数 (0〜3)
+    rare_count = sum([1 for r in [b_rare, y_rare, n_rare] if r])
+    if rare_count == 3:
+        rare_pattern = "🔥 3サイト一致 (3/3)"
+    elif rare_count == 2:
+        rare_pattern = "⚡ 2サイト一致 (2/3)"
+    elif rare_count == 1:
+        rare_pattern = "💧 1サイトのみ (1/3)"
     else:
-        # データ蓄積初期のスコア算出ロジック（得点正規化 + 印スコア）
-        pt_norm = (race_df['pt'] - race_df['pt'].min()) / (race_df['pt'].max() - race_df['pt'].min() + 0.001) * 10
-        race_df['ai_score'] = pt_norm * 0.5 + race_df['mark_score'] * 0.5
-        race_df['AI1着確率'] = (race_df['ai_score'] / race_df['ai_score'].sum() * 100).round(1)
+        rare_pattern = "🟩 荒れ指定なし (0/3)"
 
-    # ランキング順に並び替え
-    ranking = race_df.sort_values(by='ai_score', ascending=False).reset_index(drop=True)
-    
-    st.subheader("🏆 1着可能性ランキング")
-    for rank, row in ranking.iterrows():
-        st.write(f"**{rank+1}位**: **{int(row['car'])}番車** （競走得点: {row['pt']} / 印: {row['mark']}） ── **1着予想確率: {row['AI1着確率']}%**")
+    # 軸車番の重なり
+    axes = [a for a in [b_axis, y_axis, n_axis] if a is not None and a > 0]
+    if len(axes) == 3:
+        if axes[0] == axes[1] == axes[2]:
+            axis_pattern = "🎯 軸3サイト一致"
+        elif axes[0] == axes[1] or axes[1] == axes[2] or axes[0] == axes[2]:
+            axis_pattern = "⚔️ 軸2サイト一致"
+        else:
+            axis_pattern = "❓ 軸完全不一致"
+    else:
+        axis_pattern = "未設定"
 
-    # 4. レース結果の登録と自動学習
-    st.divider()
-    st.header("3. 📝 レース結果の登録（AI自動学習）")
+    return rare_pattern, axis_pattern, rare_count
+# --- ここから Part 3 ---
+
+with tab3:
+    st.subheader("📊 BYN クロス分析・蓄積データ")
+    history = load_json(DATA_FILE, [])
     
-    col_r1, col_r2, col_r3 = st.columns(3)
-    with col_r1:
-        win_car = st.number_input("1着の車番", min_value=1, max_value=7, value=int(ranking.iloc[0]['car']))
-    
-    if st.button("🚀 レース結果を登録してAIに学習させる！"):
-        # レース結果フラグのセット
-        race_df['is_1st'] = race_df['car'].apply(lambda x: 1 if x == win_car else 0)
+    if not history:
+        st.info("まだ蓄積データがありません。「結果の入力・蓄積」で結果を保存してください！")
+    else:
+        # 期間絞り込み
+        dates = [h['date'] for h in history if 'date' in h]
+        min_d = datetime.datetime.strptime(min(dates), "%Y-%m-%d").date() if dates else datetime.date.today()
+        max_d = datetime.datetime.strptime(max(dates), "%Y-%m-%d").date() if dates else datetime.date.today()
         
-        # 学習データベースに追加保存
-        new_save_df = race_df[['car', 'pt', 'mark', 'mark_score', 'is_1st']]
-        new_save_df.to_csv(DATA_FILE, mode='a', header=not os.path.exists(DATA_FILE), index=False)
+        col_d1, col_d2 = st.columns(2)
+        with col_d1: start_d = st.date_input("開始日", value=min_d, key="s_d")
+        with col_d2: end_d = st.date_input("終了日", value=max_d, key="e_d")
         
-        st.success(f"1着: {win_car}番車の結果を学習データベースに蓄積しました！AIが進化しました。")
-        st.balloons()
+        filtered = []
+        for h in history:
+            try:
+                h_d = datetime.datetime.strptime(h['date'], "%Y-%m-%d").date()
+                if start_d <= h_d <= end_d:
+                    filtered.append(h)
+            except:
+                filtered.append(h)
+                
+        st.markdown(f"### 📈 蓄積データ数: **{len(filtered)}** 件")
+        
+        if filtered:
+            # 荒れ一致パターン別分析
+            st.markdown("#### 🔥 1. 「荒れ予想指定」重なり別の傾向")
+            patterns = ["🔥 3サイト一致 (3/3)", "⚡ 2サイト一致 (2/3)", "💧 1サイトのみ (1/3)", "🟩 荒れ指定なし (0/3)"]
+            
+            for pat in patterns:
+                pat_data = [h for h in filtered if h.get("rare_pattern") == pat]
+                cnt = len(pat_data)
+                if cnt > 0:
+                    avg_pay = sum(h.get("payout", 0) for h in pat_data) / cnt
+                    max_pay = max(h.get("payout", 0) for h in pat_data)
+                    tot_profit = sum(h.get("profit", 0) for h in pat_data)
+                    tot_inv = sum(h.get("investment", 0) for h in pat_data)
+                    rec_rate = (sum(h.get("payout", 0) for h in pat_data) / tot_inv * 100) if tot_inv > 0 else 0
+                    
+                    st.write(f"**【{pat}】** ({cnt}件)")
+                    st.write(f"- 平均払戻金: `{int(avg_pay):,} 円` ｜ 最高配当: `{max_pay:,} 円` ｜ 回収率: `{rec_rate:.1f}%` (収支: `{tot_profit:+,} 円`)")
+            
+            st.markdown("---")
+            st.markdown("#### 🎯 2. 「軸車番」重なり別の傾向")
+            axis_pats = ["🎯 軸3サイト一致", "⚔️ 軸2サイト一致", "❓ 軸完全不一致"]
+            for apat in axis_pats:
+                apat_data = [h for h in filtered if h.get("axis_pattern") == apat]
+                cnt = len(apat_data)
+                if cnt > 0:
+                    avg_pay = sum(h.get("payout", 0) for h in apat_data) / cnt
+                    st.write(f"**【{apat}】** ({cnt}件) ｜ 平均払戻金: `{int(avg_pay):,} 円`")
+
+        st.markdown("---")
+        st.subheader("📝 レース履歴一覧")
+        for idx, h in enumerate(history):
+            title = f"📅 {h['date']} {h.get('place','')} {h.get('race_num','')}R ｜ 結果:{h.get('actual_result','')} ｜ 払戻:{h.get('payout',0):,}円"
+            with st.expander(title):
+                st.write(f"**荒れ指定パターン**: {h.get('rare_pattern')} ｜ **軸パターン**: {h.get('axis_pattern')}")
+                st.write(f"**投資**: {h.get('investment',0):,}円 / **払戻**: {h.get('payout',0):,}円 / **収支**: {h.get('profit',0):+,}円")
+                
+                if st.button("🗑️ 履歴から削除", key=f"del_h_{idx}"):
+                    history.pop(idx)
+                    save_json(DATA_FILE, history)
+                    st.success("削除しました！")
+                    st.rerun()
