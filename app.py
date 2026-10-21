@@ -20,7 +20,6 @@ def save_json(file_path, data):
 
 def analyze_byn_match(b_rare, y_rare, n_rare, b_axis, y_axis, n_axis):
     """B・Y・Nの重なり具合を自動判定"""
-    # 荒れ指定の重なり数 (0〜3)
     rare_count = sum([1 for r in [b_rare, y_rare, n_rare] if r])
     if rare_count == 3:
         rare_pattern = "🔥 3サイト一致 (3/3)"
@@ -31,7 +30,6 @@ def analyze_byn_match(b_rare, y_rare, n_rare, b_axis, y_axis, n_axis):
     else:
         rare_pattern = "🟩 荒れ指定なし (0/3)"
 
-    # 軸車番の重なり
     axes = [a for a in [b_axis, y_axis, n_axis] if a is not None and a > 0]
     if len(axes) == 3:
         if axes[0] == axes[1] == axes[2]:
@@ -44,8 +42,8 @@ def analyze_byn_match(b_rare, y_rare, n_rare, b_axis, y_axis, n_axis):
         axis_pattern = "未設定"
 
     return rare_pattern, axis_pattern, rare_count
-# --- ここから Part 2 ---
 
+# --- アプリ画面構造 ---
 st.set_page_config(page_title="BYN - 競輪3サイト重なり検証", page_icon="🎲")
 st.title("🎲 BYN (B × Y × N) クロスアナリティクス")
 st.markdown("予想サイト **B・Y・N** の荒れ予想＆軸の重なりと配当傾向を検証！")
@@ -150,7 +148,6 @@ with tab2:
                         pending.pop(idx)
                         save_json(PENDING_FILE, pending)
                         st.rerun()
-# --- ここから Part 3 ---
 
 with tab3:
     st.subheader("📊 BYN クロス分析・蓄積データ")
@@ -159,7 +156,6 @@ with tab3:
     if not history:
         st.info("まだ蓄積データがありません。「結果の入力・蓄積」で結果を保存してください！")
     else:
-        # 期間絞り込み
         dates = [h['date'] for h in history if 'date' in h]
         min_d = datetime.datetime.strptime(min(dates), "%Y-%m-%d").date() if dates else datetime.date.today()
         max_d = datetime.datetime.strptime(max(dates), "%Y-%m-%d").date() if dates else datetime.date.today()
@@ -180,7 +176,6 @@ with tab3:
         st.markdown(f"### 📈 蓄積データ数: **{len(filtered)}** 件")
         
         if filtered:
-            # 荒れ一致パターン別分析
             st.markdown("#### 🔥 1. 「荒れ予想指定」重なり別の傾向")
             patterns = ["🔥 3サイト一致 (3/3)", "⚡ 2サイト一致 (2/3)", "💧 1サイトのみ (1/3)", "🟩 荒れ指定なし (0/3)"]
             
