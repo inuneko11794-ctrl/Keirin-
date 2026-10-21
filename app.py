@@ -2,7 +2,16 @@ import datetime
 import json
 import os
 from collections import Counter
+import google.generativeai as genai
+from PIL import Image
 import streamlit as st
+
+# --- GEMINI API 設定 ---
+if "GEMINI_API_KEY" in st.secrets:
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    except Exception:
+        pass
 
 DATA_FILE = "byn_history.json"
 PENDING_FILE = "byn_pending.json"
@@ -45,14 +54,35 @@ def analyze_byn_match(b_rare, y_rare, n_rare, b_axis, y_axis, n_axis):
     return rare_pattern, axis_pattern, rare_count
 
 
+# --- 2枚画像から着順と払戻金を自動照合・抽出 ---
+def extract_results_from_2images(img_res, img_pay):
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    prompt = """Analyze these 2 images together:
+- Image 1: Race results (1着-2着-3着 car numbers for each race 1R-12R).
+- Image 2: Payout amounts (3連単 payouts in yen for each race 1R-12R).
+
+Match each race number (1R, 2R...) and extract as valid JSON array in this EXACT structure:
+[
+  {"race_num": 1, "result": "5-1-6", "payout": 920},
+  {"race_num": 2, "result": "2-5-7", "payout": 2050}
+]
+- "payout" must be 3連単 payout integer (remove yen and commas).
+- If cancelled or refund, set payout to 0.
+Return ONLY JSON."""
+    response = model.generate_content([prompt, img_res, img_pay])
+    json_text = response.text.replace("```json", "").replace("```", "").strip()
+    return json.loads(json_text)
+
+
 st.set_page_config(page_title="BYN - 競輪3サイト重なり検証", page_icon="🎲")
 st.title("🎲 BYN (B × Y × N) クロスアナリティクス")
 st.markdown("予想サイト **B・Y・N** の荒れ予想＆軸の重なりと配当傾向を検証！")
 
 tab1, tab2, tab3 = st.tabs(
-    ["✍️ レース＆BYN予想入力", "📝 結果の入力・蓄積", "📊 BYNデータ分析"]
+    ["✍️ レース＆BYN予想入力", "📝 結果入力＆2枚画像AI照合", "📊 BYNデータ分析"]
 )
 
+# --- TAB 1: 予想入力 ---
 with tab1:
     st.subheader("✍️ レース情報とBYN予想の入力")
 
@@ -91,7 +121,7 @@ with tab1:
         st.markdown("### 【 サイト N 】")
         n_rare = st.checkbox("🔥 荒れ予想指定", key="n_rare")
         n_axis = st.number_input(
-            "本命・軸車番", min_value=0, max_value=9, value=1, key="n_axis"
+            "本命・軸车番", min_value=0, max_value=9, value=1, key="n_axis"
         )
         n_memo = st.text_input("Nのメモ", value="", key="n_memo")
 
@@ -121,8 +151,41 @@ with tab1:
         save_json(PENDING_FILE, pending)
         st.success(f"{place_name}{race_num}R の予想をストックしました！")
 
+# --- TAB 2: 結果入力 & 2枚画像AI自動照合 ---
 with tab2:
-    st.subheader("📝 結果待ちレースの着順・払戻金入力")
+    st.subheader("📸 2枚の画像から全レース結果・配当を一括自動読み取り")
+    col_img1, col_img2 = st.columns(2)
+    with col_img1:
+        file_res = st.file_uploader(
+            "1. 着順画像（左）", type=["png", "jpg", "jpeg"], key="up_res"
+        )
+    with col_img2:
+        file_pay = st.file_uploader(
+            "2. 払戻金画像（右）", type=["png", "jpg", "jpeg"], key="up_pay"
+        )
+
+    if file_res and file_pay:
+        if st.button("⚡ 2枚の画像をAIで自動照合する"):
+            with st.spinner("AIが着順と払戻金をマッチング中..."):
+                try:
+                    img1 = Image.open(file_res)
+                    img2 = Image.open(file_pay)
+                    extracted_list = extract_results_from_2images(img1, img2)
+                    st.session_state["extracted_results"] = extracted_list
+                    st.success("自動読み取り成功！各レースの結果を確認してください。")
+                except Exception as e:
+                    st.error(f"解析エラーが発生しました: {e}")
+
+    if "extracted_results" in st.session_state:
+        st.markdown("#### 🤖 AI解析結果リスト")
+        for item in st.session_state["extracted_results"]:
+            st.write(
+                f"- **{item['race_num']}R** ｜ 着順: `{item['result']}` ｜ 払戻金:"
+                f" `{item['payout']:,}円`"
+            )
+
+    st.markdown("---")
+    st.subheader("📝 ストック済みレースの結果入力")
     pending = load_json(PENDING_FILE, [])
 
     if not pending:
@@ -133,6 +196,16 @@ with tab2:
                 f"📅 {race['date']} {race['place']} {race['race_num']}R"
                 f" ({race['rare_pattern']})"
             )
+
+            # AI解析結果があれば初期値に適用
+            default_res = ""
+            default_pay = 0
+            if "extracted_results" in st.session_state:
+                for ex in st.session_state["extracted_results"]:
+                    if ex.get("race_num") == race.get("race_num"):
+                        default_res = ex.get("result", "")
+                        default_pay = ex.get("payout", 0)
+
             with st.expander(title):
                 st.write(
                     f"**B**: {'🔥荒れ' if race['B']['rare'] else '通常'}"
@@ -146,13 +219,15 @@ with tab2:
                 col_p1, col_p2, col_p3 = st.columns(3)
                 with col_p1:
                     actual_res = st.text_input(
-                        "着順 (例: 1-2-3)", key=f"res_{race['id']}"
+                        "着順 (例: 1-2-3)",
+                        value=default_res,
+                        key=f"res_{race['id']}",
                     )
                 with col_p2:
                     payout = st.number_input(
                         "3連単 払戻金 (円)",
                         min_value=0,
-                        value=0,
+                        value=int(default_pay),
                         step=100,
                         key=f"pay_{race['id']}",
                     )
@@ -191,14 +266,13 @@ with tab2:
                         save_json(PENDING_FILE, pending)
                         st.rerun()
 
+# --- TAB 3: データ分析 ---
 with tab3:
     st.subheader("📊 BYN クロス分析・蓄積データ")
     history = load_json(DATA_FILE, [])
 
     if not history:
-        st.info(
-            "まだ蓄積データがありません。「結果の入力・蓄積」で結果を保存してください！"
-        )
+        st.info("まだ蓄積データがありません。")
     else:
         dates = [h["date"] for h in history if "date" in h]
         min_d = (
@@ -224,7 +298,7 @@ with tab3:
                 h_d = datetime.datetime.strptime(h["date"], "%Y-%m-%d").date()
                 if start_d <= h_d <= end_d:
                     filtered.append(h)
-            except:
+            except Exception:
                 filtered.append(h)
 
         st.markdown(f"### 📈 蓄積データ数: **{len(filtered)}** 件")
