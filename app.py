@@ -43,13 +43,15 @@ def analyze_byn_match(b_rare, y_rare, n_rare, b_axis, y_axis, n_axis):
 
     return rare_pattern, axis_pattern, rare_count
 
-# --- アプリ画面構造 ---
+# --- アプリ画面設定＆タブ作成 ---
 st.set_page_config(page_title="BYN - 競輪3サイト重なり検証", page_icon="🎲")
 st.title("🎲 BYN (B × Y × N) クロスアナリティクス")
 st.markdown("予想サイト **B・Y・N** の荒れ予想＆軸の重なりと配当傾向を検証！")
 
+# ★ コピペ時にこの行が入っているかが重要です！
 tab1, tab2, tab3 = st.tabs(["✍️ レース＆BYN予想入力", "📝 結果の入力・蓄積", "📊 BYNデータ分析"])
 
+# --- TAB 1 ---
 with tab1:
     st.subheader("✍️ レース情報とBYN予想の入力")
     
@@ -105,6 +107,7 @@ with tab1:
         save_json(PENDING_FILE, pending)
         st.success(f"{place_name}{race_num}R の予想をストックしました！")
 
+# --- TAB 2 ---
 with tab2:
     st.subheader("📝 結果待ちレースの着順・払戻金入力")
     pending = load_json(PENDING_FILE, [])
@@ -149,6 +152,7 @@ with tab2:
                         save_json(PENDING_FILE, pending)
                         st.rerun()
 
+# --- TAB 3 ---
 with tab3:
     st.subheader("📊 BYN クロス分析・蓄積データ")
     history = load_json(DATA_FILE, [])
@@ -214,4 +218,4 @@ with tab3:
                     history.pop(idx)
                     save_json(DATA_FILE, history)
                     st.success("削除しました！")
-                    st.rerun()
+                    st.rerun(
