@@ -7,7 +7,7 @@ st.set_page_config(page_title="BYN Race Analyzer", layout="wide", initial_sideba
 # ---------------------------------------------------------
 # 先ほど作っていただいたHTMLを、Pythonの文字列（"""〜"""）として格納します
 # ---------------------------------------------------------
-html_code = """
+html_code = r"""
 <!DOCTYPE html>
 <html lang="ja" class="dark">
 <head>
