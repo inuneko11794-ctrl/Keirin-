@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="BYN Race Analyzer", layout="wide", initial_sidebar_state="collapsed")
 
 # ---------------------------------------------------------
-# 先ほど作っていただいたHTMLを、Pythonの文字列（"""〜"""）として格納します
+# 先ほど作っていただいたHTMLを、Pythonの文字列（r"""〜"""）として格納します
 # ---------------------------------------------------------
 html_code = r"""
 <!DOCTYPE html>
@@ -134,7 +134,6 @@ html_code = r"""
             </div>
         </div>
     </header>
-
     <!-- Main Content Layout -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
 
@@ -310,10 +309,9 @@ html_code = r"""
                                 <span id="pat-Y_N-profit" class="font-bold">¥0</span>
                             </div>
                         </div>
-
                         <!-- B & N -->
                         <div class="bg-byn-card border border-pink-500/40 rounded-2xl p-4 shadow-xl bg-gradient-to-b from-pink-500/5 via-byn-card to-byn-card flex flex-col justify-between space-y-3">
-                              <div class="flex justify-between items-center">
+                            <div class="flex justify-between items-center">
                                 <div class="flex items-center gap-2">
                                     <div class="flex -space-x-1">
                                         <span class="w-6 h-6 rounded-full bg-blue-500 text-white font-bold text-xs flex items-center justify-center border border-slate-900">B</span>
@@ -323,7 +321,6 @@ html_code = r"""
                                 </div>
                                 <span id="pat-B_N-count" class="text-xs text-gray-400 font-bold">0件</span>
                             </div>
-
                             <div class="grid grid-cols-2 gap-2">
                                 <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800 text-center">
                                     <span class="text-[10px] text-gray-400 block">回収率</span>
@@ -334,7 +331,6 @@ html_code = r"""
                                     <span id="pat-B_N-hit" class="number-font text-2xl font-bold text-emerald-400">0.0%</span>
                                 </div>
                             </div>
-
                             <div class="flex justify-between items-center text-xs text-gray-300 pt-1 border-t border-slate-800/80">
                                 <span class="text-gray-400">純損益:</span>
                                 <span id="pat-B_N-profit" class="font-bold">¥0</span>
@@ -483,7 +479,6 @@ html_code = r"""
                     </div>
 
                     <hr class="border-byn-border">
-
                     <!-- Step 3: Multi-Ticket Input -->
                     <div class="space-y-3">
                         <div class="flex justify-between items-center">
@@ -565,6 +560,7 @@ html_code = r"""
                 </form>
             </div>
         </section>
+
         <!-- TAB 3: RECORDS LIST -->
         <section id="tab-records" class="hidden space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-byn-card p-4 rounded-xl border border-byn-border shadow-md">
@@ -806,7 +802,7 @@ html_code = r"""
                 <div class="relative w-1/3 min-w-[100px]">
                     <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">¥</span>
                     <input type="number" min="100" step="100" value="${amountVal}" oninput="updateTotalInvest()" class="ticket-amount w-full bg-slate-800 border-none rounded md py-1.5 pl-6 pr-2 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-blue-500 number-font text-right">
-                </div>
+                                </div>
                 <button type="button" onclick="removeTicketRow('${rowId}')" class="text-gray-500 hover:text-rose-500 px-2 py-1 transition">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -932,7 +928,6 @@ html_code = r"""
                 saveData();
             }
         }
-
         function initCanvas() {
             canvas = document.getElementById('handwriting-canvas');
             ctx = canvas.getContext('2d');
@@ -1049,6 +1044,7 @@ html_code = r"""
 
             if(document.getElementById('comparisonChart')) renderChart(chartLabels, chartRoiData, chartHitData);
         }
+
         function renderChart(labels, roiData, hitData) {
             const ctx = document.getElementById('comparisonChart').getContext('2d');
             if (chartInstance) chartInstance.destroy();
@@ -1069,7 +1065,6 @@ html_code = r"""
                 plugins: [baselinePlugin]
             });
         }
-
         function updateRecordCountBadge() { document.getElementById('record-count-badge').textContent = races.length; }
 
         function renderRecords() {
@@ -1159,15 +1154,38 @@ html_code = r"""
             try {
                 const { data: { text } } = await Tesseract.recognize(file, 'jpn+eng');
                 const lines = text.split('\n'); let currentR = 1; ocrParsedData[type] = { raw: text, races: {} };
+                
                 lines.forEach(line => {
                     if (type === 'arrival') {
                         if (line.includes('中止')) { ocrParsedData.arrival.races[currentR] = '中止'; currentR++; }
-                        else { const cMatch = line.match(/([1-9])\s*[-ー‐]?\s*([1-9])\s*[-ー‐]?\s*([1-9])/); if (cMatch && currentR <= 12) { ocrParsedData.arrival.races[currentR] = `${cMatch[1]}-${cMatch[2]}-${cMatch[3]}`; currentR++; } }
+                        else { 
+                            const cMatch = line.match(/([1-9])[^0-9\-ー‐]*[-ー‐][^0-9]*([1-9])[^0-9\-ー‐]*[-ー‐][^0-9]*([1-9])/); 
+                            if (cMatch && currentR <= 12) { 
+                                ocrParsedData.arrival.races[currentR] = `${cMatch[1]}-${cMatch[2]}-${cMatch[3]}`; 
+                                currentR++; 
+                            } 
+                        }
                     } else if (type === 'payout') {
-                        if (line.includes('全返還') || line.includes('中止')) { ocrParsedData.payout.races[currentR] = 0; currentR++; }
-                        else { const pMatches = line.match(/([0-9,]+)\s*円/g); if (pMatches && pMatches.length > 0 && currentR <= 12) { ocrParsedData.payout.races[currentR] = parseInt(pMatches[pMatches.length - 1].replace(/[^0-9]/g, '')) || 0; currentR++; } }
+                        if (line.includes('全返還') || line.includes('中止')) { 
+                            if (currentR <= 12) {
+                                ocrParsedData.payout.races[currentR] = 0; 
+                                currentR++; 
+                            }
+                        }
+                        else { 
+                            const pMatches = line.match(/([0-9,]+)\s*円/g); 
+                            if (pMatches && pMatches.length > 0 && currentR <= 12) { 
+                                const lastMatch = pMatches[pMatches.length - 1];
+                                const val = parseInt(lastMatch.replace(/[^0-9]/g, '')) || 0; 
+                                if (val > 0) { 
+                                    ocrParsedData.payout.races[currentR] = val; 
+                                    currentR++; 
+                                }
+                            } 
+                        }
                     }
                 });
+                
                 loading.classList.add('hidden'); preview.classList.remove('hidden'); box.classList.remove('border-amber-500');
                 if (type === 'arrival') box.classList.add('border-indigo-500'); else box.classList.add('border-emerald-500');
                 renderOcrResults();
@@ -1257,4 +1275,3 @@ html_code = r"""
 # Streamlit上でHTMLを表示（高さは1000pxなどに指定し、スクロール可能にする）
 components.html(html_code, height=1000, scrolling=True)
 
-        
