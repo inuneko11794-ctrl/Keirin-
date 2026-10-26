@@ -1,0 +1,231 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-display: "Teko", "IBM Plex Sans JP", sans-serif;
+
+  --color-ink: #10120e;
+  --color-ink-2: #171a14;
+  --color-panel: #1c2119;
+  --color-panel-2: #262c22;
+  --color-line: #3a4034;
+  --color-paper: #f3efe4;
+  --color-muted: #b7b1a3;
+  --color-faint: #8d887c;
+
+  --color-heat: #e23d2b;
+  --color-site-b: #3cb4d6;
+  --color-site-y: #e6b325;
+  --color-site-n: #d6f25c;
+}
+
+@layer base {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--color-paper) 5%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 4.5rem 100%;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:not(:disabled):active {
+    transform: translateY(1px);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-site-n);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-heat);
+    color: var(--color-paper);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    button:active {
+      transform: none;
+    }
+  }
+}
+
+@layer components {
+  .kicker {
+    color: var(--color-faint);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+  }
+
+  .num {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 0.85;
+  }
+
+  .panel {
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid var(--color-line);
+    border-radius: 0.875rem;
+    background: color-mix(in oklab, var(--color-panel) 92%, transparent);
+  }
+
+  .panel-alert {
+    border-color: var(--color-heat);
+  }
+
+  .field {
+    min-height: 2.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-ink);
+    color: var(--color-paper);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+
+  .field:focus {
+    border-color: var(--color-site-n);
+    outline: none;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  }
+
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .btn-heat {
+    background: var(--color-heat);
+    color: var(--color-paper);
+  }
+
+  .btn-heat:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--color-heat) 86%, white);
+  }
+
+  .btn-ghost {
+    border: 1px solid var(--color-line);
+    background: transparent;
+    color: var(--color-paper);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    border-color: var(--color-muted);
+    background: var(--color-panel-2);
+  }
+
+  .btn-ink {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  .btn-ink:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--color-paper) 88%, var(--color-site-n));
+  }
+
+  .mark {
+    display: grid;
+    height: 2.75rem;
+    width: 2.75rem;
+    place-items: center;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-ink);
+    color: var(--color-faint);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
+  .mark-on-b {
+    border-color: transparent;
+    background: var(--color-site-b);
+    color: var(--color-ink);
+  }
+
+  .mark-on-y {
+    border-color: transparent;
+    background: var(--color-site-y);
+    color: var(--color-ink);
+  }
+
+  .mark-on-n {
+    border-color: transparent;
+    background: var(--color-site-n);
+    color: var(--color-ink);
+  }
+
+  .mark-hit {
+    border-color: transparent;
+    background: var(--color-heat);
+    color: var(--color-paper);
+  }
+
+  .heat-cell {
+    display: grid;
+    width: 100%;
+    height: 1.7rem;
+    place-items: center;
+    border-radius: 0.25rem;
+    background: color-mix(in oklab, var(--color-heat) calc(var(--p, 0) * 100%), var(--color-ink));
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  .sheet {
+    min-width: 52rem;
+  }
+
+  .wash {
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-heat) 22%, transparent),
+      transparent 72%
+    );
+  }
+}
+
