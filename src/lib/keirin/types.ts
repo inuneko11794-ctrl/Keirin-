@@ -85,6 +85,24 @@ export type ThirdRow = {
   avgP3: number;
 };
 
+export type OverlapCar = { car: string; count: number; share: number };
+
+export type RoundRow = {
+  raceNo: number;
+  count: number;
+  mansha: number;
+  manshaRate: number;
+  avgP3: number;
+};
+
+export type CarLineCell = {
+  car: string;
+  total: number;
+  top: string;
+  topCount: number;
+  byLine: { line: string; count: number }[];
+};
+
 export type DashModel = {
   total: number;
   manshaCount: number;
@@ -107,6 +125,9 @@ export type DashModel = {
     manPct: number;
     lift: number | null;
   }[];
+  carLines: { all: CarLineCell[]; man: CarLineCell[] };
+  rounds: RoundRow[];
+  overlapWinCars: Record<SiteKey, { count: number; cars: OverlapCar[] }>;
   siteLines: { line: string; B: number; Y: number; N: number }[];
   sums: { sum: number; count: number; avgP3: number; mansha: number }[];
   pairs: string[];

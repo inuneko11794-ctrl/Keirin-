@@ -81,6 +81,14 @@ export function parseLine(line: string): Race | null {
     rest = rest.replace(lineM[0], " ");
   }
 
+  let raceNo: number | undefined;
+  const raceNoM = rest.match(/(?:^|\s)(\d{1,2})\s*R\b|\bR\s*(\d{1,2})(?=\s|$)/i);
+  if (raceNoM) {
+    const n = Number(raceNoM[1] ?? raceNoM[2]);
+    if (n >= 1 && n <= 12) raceNo = n;
+    rest = rest.replace(raceNoM[0], " ");
+  }
+
   let racers = "";
   const fieldM = rest.match(/([5-9])\s*車/);
   if (fieldM) {
@@ -140,6 +148,7 @@ export function parseLine(line: string): Race | null {
   }
 
   return blankRace({
+    raceNo,
     order,
     payout2,
     payout3,

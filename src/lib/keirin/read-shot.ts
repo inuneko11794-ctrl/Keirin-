@@ -458,6 +458,7 @@ export function racesFromReading(order: OrderRow[], payout: PayoutRow[]): Race[]
     if (!row && !pay) continue;
     races.push(
       blankRace({
+        raceNo: i < 12 ? i + 1 : undefined,
         order: row ? `${row.cars[0]}-${row.cars[1]}-${row.cars[2]}` : "",
         tech1: row?.techs[0] ?? "",
         tech2: row?.techs[1] ?? "",

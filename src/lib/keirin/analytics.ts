@@ -1,7 +1,9 @@
 import {
   LINES,
   SITES,
+  type CarLineCell,
   type CondRow,
+  type RoundRow,
   type DashModel,
   type Heat,
   type PairRow,
@@ -75,6 +77,83 @@ function betNames(race: Race) {
 
 function anyHit(race: Race) {
   return SITES.some((site) => race.sites[site]?.hit);
+}
+
+function overlapWinCarsOf(races: Race[]): DashModel["overlapWinCars"] {
+  const out = {
+    B: { count: 0, cars: [] },
+    Y: { count: 0, cars: [] },
+    N: { count: 0, cars: [] },
+  } as DashModel["overlapWinCars"];
+  for (const site of SITES) {
+    const counts = new Map<string, number>();
+    let total = 0;
+    for (const race of races) {
+      if (!race.sites[site]?.bet) continue;
+      if (betNames(race).length < 2) continue;
+      const car = orderParts(race.order)[0] ?? "";
+      if (!car) continue;
+      total += 1;
+      counts.set(car, (counts.get(car) ?? 0) + 1);
+    }
+    out[site] = {
+      count: total,
+      cars: [...counts.entries()]
+        .map(([car, count]) => ({ car, count, share: total ? (count / total) * 100 : 0 }))
+        .sort((a, b) => b.count - a.count || Number(a.car) - Number(b.car)),
+    };
+  }
+  return out;
+}
+
+function roundsOf(races: Race[]): RoundRow[] {
+  const bucket = new Map<number, { count: number; mansha: number; p3: number }>();
+  for (const race of races) {
+    const raceNo = race.raceNo;
+    if (!raceNo || raceNo < 1 || raceNo > 12) continue;
+    const cur = bucket.get(raceNo) ?? { count: 0, mansha: 0, p3: 0 };
+    cur.count += 1;
+    cur.p3 += money(race.payout3);
+    if (isMansha(race)) cur.mansha += 1;
+    bucket.set(raceNo, cur);
+  }
+  return [...bucket.entries()]
+    .map(([raceNo, cell]) => ({
+      raceNo,
+      count: cell.count,
+      mansha: cell.mansha,
+      manshaRate: (cell.mansha / cell.count) * 100,
+      avgP3: cell.p3 / cell.count,
+    }))
+    .sort((a, b) => a.raceNo - b.raceNo);
+}
+
+function carLineOf(races: Race[], lineKeys: string[]): CarLineCell[] {
+  const bucket = new Map<string, Map<string, number>>();
+  for (const race of races) {
+    const car = orderParts(race.order)[0] ?? "";
+    if (!car || !race.winLine) continue;
+    const map = bucket.get(car) ?? new Map<string, number>();
+    map.set(race.winLine, (map.get(race.winLine) ?? 0) + 1);
+    bucket.set(car, map);
+  }
+  return [...bucket.entries()]
+    .map(([car, map]) => {
+      const byLine = lineKeys
+        .map((line) => ({ line, count: map.get(line) ?? 0 }))
+        .filter((row) => row.count > 0);
+      const total = byLine.reduce((sum, row) => sum + row.count, 0);
+      const top = [...byLine].sort((a, b) => b.count - a.count || a.line.localeCompare(b.line))[0];
+      return {
+        car,
+        total,
+        top: top?.line ?? "—",
+        topCount: top?.count ?? 0,
+        byLine,
+      };
+    })
+    .filter((row) => row.total > 0)
+    .sort((a, b) => Number(a.car) - Number(b.car));
 }
 
 function heatOf(races: Race[], take: (race: Race) => boolean): Heat {
@@ -318,6 +397,11 @@ export function buildDash(races: Race[]): DashModel {
     })
     .filter((row) => row.all > 0 || row.mansha > 0);
 
+  const carLines = {
+    all: carLineOf(races, lineKeys),
+    man: carLineOf(manWithOrder, lineKeys),
+  };
+
   const siteLineMap: Record<SiteKey, Map<string, number>> = {
     B: new Map(),
     Y: new Map(),
@@ -470,6 +554,9 @@ export function buildDash(races: Race[]): DashModel {
     winCars,
     zones,
     lines,
+    carLines,
+    rounds: roundsOf(races),
+    overlapWinCars: overlapWinCarsOf(races),
     siteLines,
     sums,
     pairs,

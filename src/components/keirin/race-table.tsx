@@ -37,9 +37,21 @@ export function RaceTable({ rows, onChange, onSite, onDelete }: Props) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((race, index) => (
+          {rows.map((race) => (
             <tr key={race.id} className="border-b border-line align-middle">
-              <td className="px-2 py-2 text-muted">{race.raceNo ?? index + 1}</td>
+              <td className="px-2 py-2">
+                <input
+                  className="field w-14"
+                  inputMode="numeric"
+                  value={race.raceNo ?? ""}
+                  aria-label="レース番号"
+                  placeholder="R"
+                  onChange={(event) => {
+                    const n = Number(event.target.value.replace(/\D/g, ""));
+                    onChange(race.id, { raceNo: n >= 1 && n <= 12 ? n : undefined });
+                  }}
+                />
+              </td>
               <td className="px-2 py-2">
                 <input
                   className="field w-24"

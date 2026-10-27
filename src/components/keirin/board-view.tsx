@@ -18,7 +18,8 @@ import {
   YAxis,
 } from "recharts";
 import { buildInsights, pct, yen } from "@/lib/keirin/analytics";
-import type { DashModel, Heat } from "@/lib/keirin/types";
+import { SITES } from "@/lib/keirin/types";
+import type { CarLineCell, DashModel, Heat, RoundRow } from "@/lib/keirin/types";
 import { cn } from "@/lib/cn";
 
 const TICK = { fill: "var(--color-muted)", fontSize: 11 };
@@ -145,6 +146,91 @@ function HeatGrid({ heat }: { heat: Heat }) {
   );
 }
 
+function Rounds({ rows }: { rows: RoundRow[] }) {
+  if (!rows.length) {
+    return <p className="text-sm text-muted">レース番号がまだありません。記録のRに、1レース目なら 1 と入れてください。</p>;
+  }
+  const rough = [...rows].sort((a, b) => b.manshaRate - a.manshaRate || b.avgP3 - a.avgP3)[0];
+  return (
+    <div className="space-y-4">
+      {rough ? (
+        <p className="text-sm">
+          いちばん荒れやすいのは <span className="font-semibold text-heat">{rough.raceNo}R</span>
+          <span className="text-muted">
+            {" "}
+            万車 {pct(rough.manshaRate)} · {rough.mansha}/{rough.count} · 平均 {yen(rough.avgP3)}
+          </span>
+        </p>
+      ) : null}
+      <ul className="space-y-3">
+        {rows.map((row) => (
+          <li key={row.raceNo}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="num text-3xl">{row.raceNo}R</span>
+              <span className="text-sm text-muted">
+                {pct(row.manshaRate)} · {row.mansha}/{row.count}
+              </span>
+            </div>
+            <div className="mt-1 h-3 overflow-hidden rounded-full bg-ink">
+              <div
+                className={cn("h-full rounded-full", row.raceNo === rough?.raceNo ? "bg-heat" : "bg-site-y/70")}
+                style={{ width: `${row.manshaRate}%` }}
+              />
+            </div>
+            <p className="mt-1 text-xs text-muted">平均3連単 {yen(row.avgP3)}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CarLines({ rows }: { rows: CarLineCell[] }) {
+  if (!rows.length) return <p className="text-sm text-muted">1着とラインが揃ったレースがまだありません。</p>;
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    for (const cell of row.byLine) totals.set(cell.line, (totals.get(cell.line) ?? 0) + cell.count);
+  }
+  const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+  const grand = ranked.reduce((sum, [, count]) => sum + count, 0);
+  const [topLine, topCount] = ranked[0] ?? ["—", 0];
+  return (
+    <div className="space-y-4">
+      <p className="text-sm">
+        いちばん多いのは <span className="font-semibold text-heat">{topLine}</span>
+        <span className="text-muted">
+          {" "}
+          {topCount}回 / {grand}（{pct(grand ? (topCount / grand) * 100 : 0)}）
+        </span>
+      </p>
+      <ul className="space-y-3">
+        {rows.map((row) => (
+          <li key={row.car}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="num text-3xl">{row.car}</span>
+              <span className="text-sm text-muted">
+                最多 {row.top} · {row.topCount}/{row.total}
+              </span>
+            </div>
+            <div className="mt-1 flex h-3 gap-0.5">
+              {row.byLine.map((cell) => (
+                <div
+                  key={cell.line}
+                  className={cn("h-full rounded-sm", cell.line === row.top ? "bg-heat" : "bg-site-y/70")}
+                  style={{ width: `${(cell.count / row.total) * 100}%` }}
+                />
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              {row.byLine.map((cell) => `${cell.line} ${cell.count}`).join(" · ")}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ZoneBar({ label, 内, 中, 外 }: { label: string; 内: number; 中: number; 外: number }) {
   const total = 内 + 中 + 外 || 1;
   const parts = [
@@ -203,6 +289,7 @@ function CondTable({ rows }: { rows: { key: string; count: number; manshaRate: n
 
 export function BoardView({ model, sample }: { model: DashModel; sample: boolean }) {
   const [heatMode, setHeatMode] = useState<"all" | "man">("all");
+  const [lineMode, setLineMode] = useState<"all" | "man">("all");
   const [pair, setPair] = useState("");
   const [logScale, setLogScale] = useState(false);
   const insights = buildInsights(model, sample);
@@ -432,6 +519,22 @@ export function BoardView({ model, sample }: { model: DashModel; sample: boolean
         )}
       </Panel>
 
+      <Panel title="1着はどのラインか" hint="1着の車番ごとに、記録したラインの回数です。赤が、その車番で一番多いラインです。">
+        <div className="mb-4 flex gap-2">
+          <button type="button" className={cn("btn", lineMode === "all" ? "btn-ink" : "btn-ghost")} onClick={() => setLineMode("all")}>
+            全体
+          </button>
+          <button type="button" className={cn("btn", lineMode === "man" ? "btn-ink" : "btn-ghost")} onClick={() => setLineMode("man")}>
+            万車だけ
+          </button>
+        </div>
+        <CarLines rows={lineMode === "man" ? model.carLines.man : model.carLines.all} />
+      </Panel>
+
+      <Panel title="何レース目が荒れるか" hint="レース番号ごとの万車の割合です。赤が、いちばん荒れやすいレースです。Rが空の記録は入りません。">
+        <Rounds rows={model.rounds} />
+      </Panel>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="1着ラインのリフト" hint="万車の割合 ÷ 全体の割合。1より大きいとそのラインが万車に濃い。">
           {model.lines.length === 0 ? (
@@ -537,6 +640,61 @@ export function BoardView({ model, sample }: { model: DashModel; sample: boolean
           <CondTable rows={model.fields} />
         </Panel>
       </div>
+
+      <Panel title="被ったときの1着" hint="そのサイトが予想し、ほかのサイトも同じレースに入ったときだけです。1着車番の割合です。">
+        <div className="grid gap-4 lg:grid-cols-3">
+          {SITES.map((site) => {
+            const row = model.overlapWinCars[site];
+            const top = row.cars[0];
+            return (
+              <article key={site} className="min-w-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h4 className={cn("num text-4xl", site === "B" && "text-site-b", site === "Y" && "text-site-y", site === "N" && "text-site-n")}>
+                    {site}
+                  </h4>
+                  <p className="text-sm text-muted">{row.count}レース</p>
+                </div>
+                {row.count === 0 || !top ? (
+                  <p className="mt-3 text-sm text-muted">被ったレースがまだありません。</p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm">
+                      最多は <span className="font-semibold">{top.car}番</span>
+                      <span className="text-muted">
+                        {" "}
+                        {pct(top.share)} · {top.count}回
+                      </span>
+                    </p>
+                    <ul className="mt-3 space-y-2">
+                      {row.cars.map((car) => (
+                        <li key={car.car}>
+                          <div className="flex items-baseline justify-between text-sm">
+                            <span className="font-semibold">{car.car}番</span>
+                            <span className="text-muted">
+                              {pct(car.share)} · {car.count}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-2 overflow-hidden rounded-full bg-ink">
+                            <div
+                              className={cn(
+                                "h-full rounded-full",
+                                site === "B" && "bg-site-b",
+                                site === "Y" && "bg-site-y",
+                                site === "N" && "bg-site-n",
+                              )}
+                              style={{ width: `${car.share}%` }}
+                            />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </Panel>
 
       <Panel title="サイトの重なり" hint="誰が予想を置いたかで分けた母数です。的中時の平均は、誰か一人でも的中したレースだけ。">
         <div className="overflow-x-auto">
