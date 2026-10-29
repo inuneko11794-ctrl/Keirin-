@@ -7,7 +7,14 @@ import { StudyView } from "@/components/keirin/study-view";
 import { buildDash, filterRaces } from "@/lib/keirin/analytics";
 import { useKeirin, type ViewId } from "@/lib/keirin/store";
 import { FIELDS } from "@/lib/keirin/types";
+import { Bgm } from "@/components/keirin/bgm";
 import { cn } from "@/lib/cn";
+
+const SLICES = [
+  { id: "all", label: "全体" },
+  ...FIELDS.map((field) => ({ id: field, label: field })),
+  { id: "単騎戦", label: "単騎戦" },
+];
 
 const NAV: { id: ViewId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "board", label: "分析", icon: LayoutDashboard },
@@ -44,13 +51,19 @@ export function Dashboard() {
           ))}
         </nav>
         <p className="mt-auto text-xs leading-relaxed text-faint">このブラウザに自動で残ります。機種を変えるときだけJSONを保存してください。</p>
+        <div className="mt-4">
+          <Bgm />
+        </div>
       </aside>
 
       <div className="min-w-0 flex-1 overflow-x-hidden">
         <header className="sticky top-0 z-20 border-b border-line bg-ink lg:static">
           <div className="flex items-center justify-between gap-3 px-4 py-3 lg:hidden">
             <Wordmark />
-            <p className="shrink-0 text-xs text-faint">{races.length}R</p>
+            <div className="flex shrink-0 items-center gap-2">
+              <Bgm />
+              <p className="text-xs text-faint">{races.length}R</p>
+            </div>
           </div>
           <nav className="grid grid-cols-4 gap-1 px-3 pb-3 lg:hidden" aria-label="画面">
             {NAV.map((item) => (
@@ -67,25 +80,25 @@ export function Dashboard() {
                 {view === "board" ? "寄った数で、何が変わるか" : view === "study" ? "万車の1着は誰の癖か" : view === "book" ? "レースを残す" : "ノートを開く"}
               </h1>
             </div>
-            {view === "board" || view === "study" ? (
-              <label className="text-sm text-muted">
-                車立
-                <select
-                  className="field mt-1 w-full sm:w-40"
-                  value={filter}
-                  aria-label="車立で分析を絞る"
-                  onChange={(event) => setFilter(event.target.value)}
-                >
-                  <option value="all">すべて {races.length}R</option>
-                  {FIELDS.map((field) => (
-                    <option key={field} value={field}>
-                      {field}車立て
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
           </div>
+          {view === "board" || view === "study" ? (
+            <div className="mb-5">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="グラフの母数">
+                {SLICES.map((slice) => (
+                  <button
+                    key={slice.id}
+                    type="button"
+                    className={cn("btn min-h-11 px-3", filter === slice.id ? "btn-ink" : "btn-ghost")}
+                    aria-pressed={filter === slice.id}
+                    onClick={() => setFilter(slice.id)}
+                  >
+                    {slice.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted">この下のグラフは、選んだ {filtered.length}R だけです。</p>
+            </div>
+          ) : null}
 
           {view === "board" && model ? <BoardView model={model} sample={sample} /> : null}
           {view === "book" ? <LedgerView /> : null}

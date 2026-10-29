@@ -347,7 +347,7 @@ export function BoardView({ model, sample }: { model: DashModel; sample: boolean
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <Metric label="的中率" value={pct(site.hitRate)} note={`${site.hit}/${site.bet || 0}`} />
-              <Metric label="万車率" value={pct(site.manRate)} note={`予想のうち ${site.man}`} />
+              <Metric label="5千以上" value={pct(site.manRate)} note={`${site.man}/${site.bet || 0}`} />
               <Metric label="捕捉率" value={pct(site.capture)} note="全万車のうち" />
               <Metric label="的中時3連" value={site.hit ? yen(site.avgP3) : "—"} note={site.hit ? `2連 ${yen(site.avgP2)}` : "的中なし"} />
             </dl>
@@ -355,7 +355,7 @@ export function BoardView({ model, sample }: { model: DashModel; sample: boolean
         ))}
       </section>
       <p className="text-xs text-faint">
-        指数は的中率35、予想内の万車率25、全万車の捕捉率25、配当力15。配当力は的中時平均3連単を、3サイト中の最大を100にした相対値です。
+        指数は的中率35、予想内の5千以上25、全万車の捕捉率25、配当力15。配当力は的中時平均3連単を、3サイト中の最大を100にした相対値です。5千以上は、そのサイトが予想したレースで3連単が5,000円以上だった割合です。
       </p>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -434,7 +434,27 @@ export function BoardView({ model, sample }: { model: DashModel; sample: boolean
         </Panel>
       </div>
 
-      <Panel title="車番の合計" hint="棒が出る回数、線がその合計の平均3連単。出現と配当のズレを見ます。">
+      <Panel title="2車の車番合計" hint="1着と2着の和。棒が出る回数、線がその合計の平均2連単。">
+        {model.pairSums.length === 0 ? (
+          <Empty label="1着と2着がまだありません" />
+        ) : (
+          <FitChart>
+            <ComposedChart data={model.pairSums} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke={GRID} vertical={false} />
+              <XAxis dataKey="sum" tick={TICK} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="n" width={AXIS.width} tick={TICK} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis yAxisId="yen" orientation="right" width={AXIS.width} tick={TICK} axisLine={false} tickLine={false} />
+              <Tooltip content={<Tip moneyKeys={["平均2連単"]} />} />
+              <Legend wrapperStyle={{ color: "var(--color-paper)" }} />
+              <Bar yAxisId="n" dataKey="count" name="出現" fill="var(--color-muted)" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="n" dataKey="mansha" name="万車" fill="var(--color-heat)" radius={[4, 4, 0, 0]} />
+              <Line yAxisId="yen" dataKey="avgP2" name="平均2連単" stroke="var(--color-site-y)" strokeWidth={2} dot={false} />
+            </ComposedChart>
+          </FitChart>
+        )}
+      </Panel>
+
+      <Panel title="3連の車番合計" hint="1着から3着の和。棒が出る回数、線がその合計の平均3連単。">
         {model.sums.length === 0 ? (
           <Empty label="3連単の着順がまだありません" />
         ) : (
@@ -705,6 +725,7 @@ export function BoardView({ model, sample }: { model: DashModel; sample: boolean
                 <th className="py-2 pr-3">件数</th>
                 <th className="py-2 pr-3">万車</th>
                 <th className="py-2 pr-3">万車率</th>
+                <th className="py-2 pr-3">平均2連</th>
                 <th className="py-2 pr-3">平均3連</th>
                 <th className="py-2">的中時</th>
               </tr>
@@ -716,6 +737,7 @@ export function BoardView({ model, sample }: { model: DashModel; sample: boolean
                   <td className="py-2 pr-3">{row.count}</td>
                   <td className="py-2 pr-3">{row.mansha}</td>
                   <td className="py-2 pr-3">{pct(row.manshaRate)}</td>
+                  <td className="py-2 pr-3">{yen(row.avgP2)}</td>
                   <td className="py-2 pr-3">{yen(row.avgP3)}</td>
                   <td className="py-2">{row.avgP3OnHit ? yen(row.avgP3OnHit) : "—"}</td>
                 </tr>

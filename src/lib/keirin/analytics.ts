@@ -40,6 +40,7 @@ export function orderParts(order: string) {
 
 export function filterRaces(races: Race[], field: string) {
   if (field === "all") return races;
+  if (field === "単騎戦") return races.filter((race) => race.battle === "単騎戦");
   return races.filter((race) => race.racers === field);
 }
 
@@ -61,6 +62,14 @@ function trioSum(order: string) {
   const parts = orderParts(order).map(Number);
   if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
   return (parts[0] ?? 0) + (parts[1] ?? 0) + (parts[2] ?? 0);
+}
+
+function pairSum(order: string) {
+  const parts = orderParts(order).map(Number);
+  const first = parts[0];
+  const second = parts[1];
+  if (first == null || second == null || Number.isNaN(first) || Number.isNaN(second)) return null;
+  return first + second;
 }
 
 function zoneOf(car: string) {
@@ -265,11 +274,11 @@ export function buildDash(races: Race[]): DashModel {
       const cell = race.sites[site];
       if (!cell) continue;
       if (cell.bet) bet += 1;
+      if (cell.bet && money(race.payout3) >= 5000) man += 1;
       if (cell.bet && cell.hit) {
         hit += 1;
         p2 += money(race.payout2);
         p3 += money(race.payout3);
-        if (isMansha(race)) man += 1;
       }
       if (cell.hit && isMansha(race)) captured += 1;
     }
@@ -295,7 +304,7 @@ export function buildDash(races: Race[]): DashModel {
 
   const radar = [
     { axis: "的中率", B: sites[0]?.hitRate ?? 0, Y: sites[1]?.hitRate ?? 0, N: sites[2]?.hitRate ?? 0 },
-    { axis: "万車率", B: sites[0]?.manRate ?? 0, Y: sites[1]?.manRate ?? 0, N: sites[2]?.manRate ?? 0 },
+    { axis: "5千以上", B: sites[0]?.manRate ?? 0, Y: sites[1]?.manRate ?? 0, N: sites[2]?.manRate ?? 0 },
     { axis: "捕捉率", B: sites[0]?.capture ?? 0, Y: sites[1]?.capture ?? 0, N: sites[2]?.capture ?? 0 },
     { axis: "配当力", B: sites[0]?.payoutPower ?? 0, Y: sites[1]?.payoutPower ?? 0, N: sites[2]?.payoutPower ?? 0 },
   ];
@@ -328,15 +337,16 @@ export function buildDash(races: Race[]): DashModel {
     .map(([key, rows]) => {
       const hits = rows.filter(anyHit);
       const mansha = rows.filter(isMansha).length;
-      const avg = (list: Race[]) =>
-        list.length ? list.reduce((sum, race) => sum + money(race.payout3), 0) / list.length : 0;
+      const avg = (list: Race[], field: "payout2" | "payout3") =>
+        list.length ? list.reduce((sum, race) => sum + money(race[field]), 0) / list.length : 0;
       return {
         key,
         count: rows.length,
         mansha,
         manshaRate: (mansha / rows.length) * 100,
-        avgP3: avg(rows),
-        avgP3OnHit: avg(hits),
+        avgP2: avg(rows, "payout2"),
+        avgP3: avg(rows, "payout3"),
+        avgP3OnHit: avg(hits, "payout3"),
       };
     })
     .sort((a, b) => b.count - a.count);
@@ -437,6 +447,25 @@ export function buildDash(races: Race[]): DashModel {
       sum,
       count: cell.count,
       avgP3: cell.p3 / cell.count,
+      mansha: cell.mansha,
+    }))
+    .sort((a, b) => a.sum - b.sum);
+
+  const pairMap = new Map<number, { count: number; p2: number; mansha: number }>();
+  for (const race of races) {
+    const sum = pairSum(race.order);
+    if (sum == null) continue;
+    const cur = pairMap.get(sum) ?? { count: 0, p2: 0, mansha: 0 };
+    cur.count += 1;
+    cur.p2 += money(race.payout2);
+    if (isMansha(race)) cur.mansha += 1;
+    pairMap.set(sum, cur);
+  }
+  const pairSums = [...pairMap.entries()]
+    .map(([sum, cell]) => ({
+      sum,
+      count: cell.count,
+      avgP2: cell.p2 / cell.count,
       mansha: cell.mansha,
     }))
     .sort((a, b) => a.sum - b.sum);
@@ -559,6 +588,7 @@ export function buildDash(races: Race[]): DashModel {
     overlapWinCars: overlapWinCarsOf(races),
     siteLines,
     sums,
+    pairSums,
     pairs,
     thirds,
     topPairs,
@@ -611,10 +641,15 @@ export function buildInsights(model: DashModel, sample: boolean) {
   const busy = [...model.sums].sort((a, b) => b.count - a.count)[0];
   const rich = [...model.sums].filter((row) => row.count >= 2).sort((a, b) => b.avgP3 - a.avgP3)[0];
   if (busy && rich && busy.sum !== rich.sum) {
-    lines.push(`よく出る合計は ${busy.sum}。平均配当が高いのは合計 ${rich.sum}（${yen(rich.avgP3)}）。`);
+    lines.push(`よく出る3連の合計は ${busy.sum}。平均3連単が高いのは合計 ${rich.sum}（${yen(rich.avgP3)}）。`);
   } else if (model.topPairs[0] && model.topPairs[0].count >= 2) {
     const pair = model.topPairs[0];
     lines.push(`いちばん厚い連対は ${pair.pair}（${pair.count}回、平均3連単 ${yen(pair.avgP3)}）。`);
+  }
+  const busyPair = [...model.pairSums].sort((a, b) => b.count - a.count)[0];
+  const richPair = [...model.pairSums].filter((row) => row.count >= 2).sort((a, b) => b.avgP2 - a.avgP2)[0];
+  if (busyPair && richPair && busyPair.sum !== richPair.sum) {
+    lines.push(`よく出る2車の合計は ${busyPair.sum}。平均2連単が高いのは合計 ${richPair.sum}（${yen(richPair.avgP2)}）。`);
   }
   const allZone = model.zones[0];
   const manZone = model.zones[1];

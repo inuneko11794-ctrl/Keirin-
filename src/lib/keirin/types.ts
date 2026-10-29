@@ -53,6 +53,7 @@ export type OverlapRow = {
   count: number;
   mansha: number;
   manshaRate: number;
+  avgP2: number;
   avgP3: number;
   avgP3OnHit: number;
 };
@@ -130,6 +131,7 @@ export type DashModel = {
   overlapWinCars: Record<SiteKey, { count: number; cars: OverlapCar[] }>;
   siteLines: { line: string; B: number; Y: number; N: number }[];
   sums: { sum: number; count: number; avgP3: number; mansha: number }[];
+  pairSums: { sum: number; count: number; avgP2: number; mansha: number }[];
   pairs: string[];
   thirds: Record<string, ThirdRow[]>;
   topPairs: PairRow[];

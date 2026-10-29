@@ -1,13 +1,13 @@
 const LINKS = [
   {
-    title: "万車ノート",
-    body: "Grok上のノート。レース前の読みをここに残す。",
-    href: "https://brook-beam-sunny-arch.grok.me",
+    title: "B.Y.N ANALYZER",
+    body: "GitHubに置いた分析ページ。このアプリの記録とは別です。",
+    href: "https://inuneko11794-ctrl.github.io/-B-notameni.../",
   },
   {
-    title: "競輪予想屋さん",
-    body: "専用の予想。結果は記録タブへ戻して、B・Y・Nの印と比べる。",
-    href: "https://www.coze.com/store/agent/7700716983747198981?bot_id=true",
+    title: "万車ノート",
+    body: "レース前の読みをここに残す。",
+    href: "https://brook-beam-sunny-arch.grok.me",
   },
 ];
 
@@ -17,9 +17,7 @@ export function DeskView() {
       <section className="panel p-4 md:p-5">
         <p className="kicker">控室</p>
         <h2 className="mt-2 text-xl font-semibold">読む場所と、残す場所を分けない</h2>
-        <p className="mt-2 text-sm text-muted">
-          埋め込みが空白なら、相手側が画面内表示を拒んでいます。そのときは別のタブで開いてください。
-        </p>
+        <p className="mt-2 text-sm text-muted">埋め込みが空白なら、相手側が画面内表示を拒んでいます。そのときは別のタブで開いてください。</p>
       </section>
       {LINKS.map((link) => (
         <section key={link.href} className="panel overflow-hidden">
@@ -32,7 +30,7 @@ export function DeskView() {
               別のタブで開く
             </a>
           </div>
-          <iframe title={link.title} src={link.href} className="h-96 w-full border-t border-line bg-ink" />
+          <iframe title={link.title} src={link.href} className="h-[70vh] min-h-96 w-full border-t border-line bg-ink" />
         </section>
       ))}
     </div>
